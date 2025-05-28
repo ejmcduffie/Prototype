@@ -7,32 +7,27 @@ const router = Router();
  */
 router.post('/payment-details', (req, res) => {
   try {
-    const { tier, tokenSymbol } = req.body;
-    
-    // Mock payment amounts based on tier and token
-    const paymentAmounts = {
-      'basic': {
-        'ETH': '0.005',
-        'USDC': '9.99'
-      },
-      'premium': {
-        'ETH': '0.015',
-        'USDC': '29.99'
-      },
-      'enterprise': {
-        'ETH': '0.05',
-        'USDC': '99.99'
-      }
+    type Tier = 'basic' | 'premium' | 'enterprise';
+    type TokenSymbol = 'ETH' | 'USDC';
+
+    const { tier, tokenSymbol } = req.body as {
+      tier: Tier;
+      tokenSymbol: TokenSymbol;
     };
-    
-    // Return payment details
+
+    const paymentAmounts: Record<Tier, Record<TokenSymbol, string>> = {
+      basic: { ETH: '0.005', USDC: '9.99' },
+      premium: { ETH: '0.015', USDC: '29.99' },
+      enterprise: { ETH: '0.05', USDC: '99.99' }
+    };
+
     res.status(200).json({
       success: true,
       data: {
-        paymentAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045', // Example address
+        paymentAddress: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045',
         amount: paymentAmounts[tier][tokenSymbol],
         tokenSymbol,
-        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() // 30 minutes
+        expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString()
       }
     });
   } catch (error) {
