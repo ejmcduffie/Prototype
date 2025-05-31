@@ -87,8 +87,15 @@ export async function POST(request: NextRequest) {
     
     // Update the file status in the database
     await updateFileStatus(fileId, 'NFT_Minted', {
-      nftDetails,
-      blockchainTxHash: nftDetails.transactionHash
+      nftDetails: {
+        tokenId: nftDetails.tokenId,
+        contractAddress: nftDetails.contractAddress,
+        transactionHash: nftDetails.transactionHash,
+        tokenUri: nftDetails.tokenUri,
+        mintDate: nftDetails.mintDate,
+        blockchain: nftDetails.blockchain,
+        owner: nftDetails.owner
+      }
     });
     
     return NextResponse.json({

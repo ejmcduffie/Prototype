@@ -1,0 +1,2 @@
+FROM alpine:3.14
+RUN echo "Hello from simple test" > /test.txt
