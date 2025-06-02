@@ -1,0 +1,136 @@
+
+services:
+  # Main NextJS application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - ARWEAVE_KEY=${ARWEAVE_KEY}
+      - CHAINLINK_JOB_ID=${CHAINLINK_JOB_ID}
+      - ETH_RPC_URL=${ETH_RPC_URL}
+      - NFT_CONTRACT_ADDRESS=${NFT_CONTRACT_ADDRESS}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ancestry-network
+
+  # MongoDB database
+  mongodb:
+    image: mongo:6
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DB}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - ancestry-network
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ancestry-network
+
+  # Chainlink node for oracle verification
+  chainlink:
+    image: smartcontract/chainlink:1.13.1
+    restart: always
+    depends_on:
+      - postgres
+    ports:
+      - "6688:6688"
+    command: node start -p /chainlink-password -a /chainlink-api
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
+      - ETH_URL=${ETH_RPC_URL}
+      - ETH_CHAIN_ID=${ETH_CHAIN_ID}
+      - LINK_CONTRACT_ADDRESS=${LINK_CONTRACT_ADDRESS}
+      - CHAINLINK_TLS_PORT=0
+      - SECURE_COOKIES=false
+      - ALLOW_ORIGINS=*
+    volumes:
+      - ./chainlink-config:/chainlink
+    networks:
+      - ancestry-network
+
+  # Postgres for Chainlink node
+  postgres:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ancestry-network
+
+  # Payment service for crypto & fiat payments
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile.payment
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=${MONGODB_URI}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - ETH_RPC_URL=${ETH_RPC_URL}
+      - SUBSCRIPTION_CONTRACT_ADDRESS=${SUBSCRIPTION_CONTRACT_ADDRESS}
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - ancestry-network
+
+  # Nginx for reverse proxy and load balancing
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf:/etc/nginx/conf.d
+      - ./nginx/certificates:/etc/nginx/certificates
+      - ./nginx/www:/var/www/html
+    depends_on:
+      - app
+      - payment-service
+    networks:
+      - ancestry-network
+
+volumes:
+  mongodb_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  ancestry-network:
+    driver: bridge

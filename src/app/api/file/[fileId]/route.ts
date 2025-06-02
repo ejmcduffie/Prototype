@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
+import authOptions from '@/auth';
 import { getFileById } from '@/models/FileUpload';
 import mongoose from 'mongoose';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import { Session } from 'next-auth';
 
 // Define session type with user ID
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest, { params }: { params: { fileId: 
     }
     
     // Connect to the database
-    await dbConnect();
+    await connectToDB();
     
     // Log database connection state
     console.log(`MongoDB connection state: ${mongoose.connection.readyState}`);

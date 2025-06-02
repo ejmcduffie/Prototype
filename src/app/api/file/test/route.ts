@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import mongoose from 'mongoose';
 
 export async function GET() {
   try {
-    const conn = await dbConnect();
+    const conn = await connectToDB();
     const isConnected = conn.connection.readyState === 1;
     
     return NextResponse.json({

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
+import authOptions from '@/auth';
 import { getFileById } from '@/models/FileUpload';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'stream';
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    await dbConnect();
+    await connectToDB();
     
     const { searchParams } = new URL(request.url);
     const fileId = searchParams.get('fileId');

@@ -10,3 +10,15 @@ coverage
 build
 dist
 public/uploads
+
+# Development files
+*.d.ts
+*.js.map
+__tests__
+
+# Exclude payment service
+payment-service/
+
+# Exclude development icons (if not needed in production)
+public/icons/**/*
+public/assets/icons/**/*

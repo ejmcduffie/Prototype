@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
+import authOptions from '@/auth';
 import { getFileById, updateFileStatus } from '@/models/FileUpload';
 import { ObjectId } from 'mongodb';
 

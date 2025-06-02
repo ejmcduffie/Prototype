@@ -9,7 +9,7 @@ import { ensureUploadsDirectory } from '@/lib/uploadUtils';
 import fs from 'fs';
 import { dbConnect } from '@/lib/dbconnect';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/auth';
+import authOptions from '@/auth';
 import { Session } from 'next-auth';
 
 // Define session type with user ID

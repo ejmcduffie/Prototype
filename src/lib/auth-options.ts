@@ -26,7 +26,7 @@ declare module 'next-auth' {
 
 // Redundant authOptions definition removed to prevent conflicts. Use src/auth.ts instead.
 
-export default {
+const authOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -104,3 +104,5 @@ export default {
   secret: process.env.NEXTAUTH_SECRET,
   debug: process.env.NODE_ENV === 'development',
 };
+
+export default authOptions;

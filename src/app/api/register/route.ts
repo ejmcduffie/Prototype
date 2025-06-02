@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import User from '@/models/User';
-import { Resend } from 'resend';
-
-// Initialize Resend with your API key
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Email validation regex
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -18,6 +14,8 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // - At least one number
 // - At least one special character
 const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -53,8 +51,11 @@ export async function POST(request: Request) {
       );
     }
     
-    await dbConnect();
+    await connectToDB();
     
+    const Resend = (await import('resend')).Resend;
+    const resend = new Resend(process.env.RESEND_API_KEY);
+
     // Check for existing user
     const existingUser = await User.findOne({ email: sanitizedEmail });
     if (existingUser) {

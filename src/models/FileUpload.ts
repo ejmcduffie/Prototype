@@ -1,5 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 
 export interface IFileUpload extends Document {
   userId: mongoose.Types.ObjectId;
@@ -59,7 +59,7 @@ console.log(`FileUploadModel initialized with collection: ${COLLECTION_NAME}`);
 export const FileUpload = FileUploadModel;
 
 export async function getFileById(id: string) {
-  await dbConnect();
+  await connectToDB();
   try {
     console.log(`MongoDB connection state: ${mongoose.connection.readyState}`);
     
@@ -84,7 +84,7 @@ export async function getFileById(id: string) {
 }
 
 export async function updateFileStatus(fileId: string, status: IFileUpload['status'], updateData: Partial<IFileUpload> = {}) {
-  await dbConnect();
+  await connectToDB();
   return FileUploadModel.updateOne(
     { _id: fileId },
     { $set: { status, ...updateData, updatedAt: new Date() } }
@@ -92,7 +92,7 @@ export async function updateFileStatus(fileId: string, status: IFileUpload['stat
 }
 
 export async function listUserFiles(userId: string) {
-  await dbConnect();
+  await connectToDB();
   return FileUploadModel.find({ userId }).sort({ uploadDate: -1 });
 }
 
@@ -114,7 +114,7 @@ export interface FileUploadData {
 // Function to save file metadata to MongoDB
 export async function saveFileToMongoDB(fileData: FileUploadData & { content?: string }) {
   try {
-    await dbConnect();
+    await connectToDB();
     
     // Create a new file document
     const newFile = new FileUploadModel({
