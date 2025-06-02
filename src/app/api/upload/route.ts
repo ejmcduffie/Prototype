@@ -7,7 +7,7 @@ import path from 'path';
 import crypto from 'crypto';
 import { ensureUploadsDirectory } from '@/lib/uploadUtils';
 import fs from 'fs';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import { getServerSession } from 'next-auth';
 import authOptions from '@/auth';
 import { Session } from 'next-auth';

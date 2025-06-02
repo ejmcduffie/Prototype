@@ -1,5 +1,5 @@
 'use client';
-import { dbConnect } from '@/lib/dbconnect';
+import { connectToDB } from '@/lib/dbconnect';
 import { useEffect, useState } from 'react';
 
 export default function DebugUsers() {
@@ -9,8 +9,12 @@ export default function DebugUsers() {
   useEffect(() => {
     async function loadUsers() {
       try {
-        const db = await dbConnect();
-        const userData = await db.collection('users').find().toArray();
+        await connectToDB();
+        const response = await fetch('/api/debug/users');
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        const userData = await response.json();
         setUsers(userData);
       } catch (error) {
         console.error('Failed to load users:', error);
