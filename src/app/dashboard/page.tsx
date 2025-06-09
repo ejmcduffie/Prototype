@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { FileList } from '@/components/dashboard/FileList';
 
 // Define types for our data
-interface FileUpload {
+export interface FileUpload {
   _id: string;
   originalName: string;
   fileType: string;
@@ -33,6 +34,43 @@ interface PaginationInfo {
   hasMore: boolean;
 }
 
+// Generate mock data for unauthenticated users
+const generateMockData = (): FileUpload[] => {
+  const mockStatuses: ('Pending' | 'Processing' | 'Verified' | 'Failed' | 'NFT_Minted')[] = 
+    ['Pending', 'Processing', 'Verified', 'Failed', 'NFT_Minted'];
+  const mockCategories = ['Census', 'Birth Certificate', 'Marriage Record', 'Death Certificate', 'Military Record'];
+  const mockFiles: FileUpload[] = [];
+  
+  for (let i = 1; i <= 5; i++) {
+    const status = mockStatuses[Math.floor(Math.random() * mockStatuses.length)];
+    const category = mockCategories[Math.floor(Math.random() * mockCategories.length)];
+    const hasNft = status === 'NFT_Minted';
+    
+    mockFiles.push({
+      _id: `mock-${i}`,
+      originalName: `${category.replace(/\s+/g, '_').toLowerCase()}_${i}.pdf`,
+      fileType: 'application/pdf',
+      fileSize: Math.floor(Math.random() * 5000000) + 100000, // 100KB - 5MB
+      fileCategory: category,
+      uploadDate: new Date(Date.now() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000).toISOString(),
+      status,
+      ...(hasNft ? {
+        nftDetails: {
+          tokenId: `0x${Math.random().toString(16).substr(2, 40)}`,
+          contractAddress: '0x1234...5678',
+          transactionHash: '0x' + Math.random().toString(16).substr(2, 64),
+          tokenUri: 'ipfs://mock-ipfs-hash',
+          mintDate: new Date().toISOString(),
+          blockchain: 'Ethereum',
+          owner: '0x' + Math.random().toString(16).substr(2, 40)
+        }
+      } : {})
+    });
+  }
+  
+  return mockFiles;
+};
+
 export default function Dashboard() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -41,6 +79,8 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isProcessingMint, setIsProcessingMint] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationInfo>({
     total: 0,
     page: 1,
@@ -48,9 +88,17 @@ export default function Dashboard() {
     totalPages: 0,
     hasMore: false,
   });
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isProcessingMint, setIsProcessingMint] = useState<string | null>(null);
+  
   const isAuthenticated = status === 'authenticated';
+        } : {})
+      });
+    }
+    
+    return mockFiles;
+  };
+  
+  const mockFiles = generateMockData();
+  const displayFiles = isAuthenticated ? files : mockFiles;
 
   // No longer redirecting unauthenticated users
   useEffect(() => {
@@ -179,26 +227,52 @@ export default function Dashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">{isAuthenticated ? 'Your Dashboard' : 'Welcome to AncestryChain'}</h1>
+      <h1 className="text-3xl font-bold mb-2">
+        {isAuthenticated ? 'Your Dashboard' : 'Welcome to AncestryChain'}
+      </h1>
       
       {!isAuthenticated && (
-        <div className="bg-blue-50 text-blue-800 p-6 mb-6 rounded-lg text-center">
-          <h2 className="text-xl font-semibold mb-3">Sign in to access your personal dashboard</h2>
-          <p className="mb-4">Create an account or sign in to upload, verify, and mint NFTs for your genealogy records.</p>
-          <div className="flex justify-center space-x-4">
-            <Link href="/login" className="bg-primary text-white px-6 py-2 rounded-md hover:bg-primary-dark transition">
+        <div className="bg-blue-50 text-blue-800 p-6 mb-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-3">
+            <span className="inline-flex items-center">
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+              Demo Mode
+            </span>
+          </h2>
+          <p className="mb-4">
+            You're viewing demo data. Sign in to see your actual files and start building your family tree.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <Link 
+              href="/login" 
+              className="inline-flex items-center bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark transition text-sm font-medium"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
               Sign In
             </Link>
-            <Link href="/register" className="bg-gray-100 text-gray-800 px-6 py-2 rounded-md hover:bg-gray-200 transition">
-              Register
+            <Link 
+              href="/register" 
+              className="inline-flex items-center bg-white text-gray-800 border border-gray-300 px-4 py-2 rounded-md hover:bg-gray-50 transition text-sm font-medium"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+              Create Account
             </Link>
           </div>
         </div>
       )}
       
       {error && (
-        <div className="bg-red-50 text-red-800 p-4 mb-6 rounded-lg">
-          {error}
+        <div className="bg-red-50 text-red-800 p-4 mb-6 rounded-lg flex items-start">
+          <svg className="w-5 h-5 mr-2 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          <div>{error}</div>
           <button 
             className="ml-2 text-red-600 hover:text-red-800" 
             onClick={() => setError(null)}
@@ -208,60 +282,82 @@ export default function Dashboard() {
         </div>
       )}
       
-      {isAuthenticated ? (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Left sidebar with filters - only shown to authenticated users */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8 sticky top-4">
-              <h2 className="text-xl font-bold mb-4">Filters</h2>
-              
-              <div className="mb-4">
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                <input
-                  type="text"
-                  id="search"
-                  className="w-full px-3 py-2 border rounded-md"
-                  placeholder="Search files..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        {/* Left sidebar with filters */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8 sticky top-4">
+            <h2 className="text-xl font-bold mb-4">
+              {isAuthenticated ? 'Filters' : 'Demo Filters'}
+              {!isAuthenticated && (
+                <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                  Demo
+                </span>
+              )}
+            </h2>
+              <div className="mb-6">
+                <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-end">
+                  <div className="w-full sm:w-1/3">
+                    <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+                      Search {!isAuthenticated && '(demo)'}
+                    </label>
+                    <input
+                      type="text"
+                      id="search"
+                      placeholder={isAuthenticated ? "Search your files..." : "Try searching 'census' or 'birth'..."}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      disabled={!isAuthenticated}
+                    />
+                  </div>
+                  <div className="w-full sm:w-1/4">
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+                      Status {!isAuthenticated && '(demo)'}
+                    </label>
+                    <select
+                      id="status"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary disabled:opacity-75 disabled:cursor-not-allowed"
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      disabled={!isAuthenticated}
+                    >
+                      <option value="">All Statuses</option>
+                      <option value="Pending">Pending</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Verified">Verified</option>
+                      <option value="Failed">Failed</option>
+                      <option value="NFT_Minted">NFT Minted</option>
+                    </select>
+                  </div>
+                  <div className="w-full sm:w-1/4">
+                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                      Category {!isAuthenticated && '(demo)'}
+                    </label>
+                    <select
+                      id="category"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary disabled:opacity-75 disabled:cursor-not-allowed"
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      disabled={!isAuthenticated}
+                    >
+                      <option value="">All Categories</option>
+                      <option value="Census">Census</option>
+                      <option value="Birth Certificate">Birth Certificate</option>
+                      <option value="Marriage Record">Marriage Record</option>
+                      <option value="Death Certificate">Death Certificate</option>
+                      <option value="Military Record">Military Record</option>
+                    </select>
+                  </div>
+                </div>
+                {!isAuthenticated && (
+                  <div className="mt-2 text-sm text-gray-500 flex items-center">
+                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                    Sign in to filter and search your own files
+                  </div>
+                )}
               </div>
-              
-              <div className="mb-4">
-                <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  id="status"
-                  className="w-full px-3 py-2 border rounded-md"
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Verified">Verified</option>
-                  <option value="NFT_Minted">NFT Minted</option>
-                  <option value="Failed">Failed</option>
-                </select>
-              </div>
-              
-              <div className="mb-4">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">File Type</label>
-                <select
-                  id="category"
-                  className="w-full px-3 py-2 border rounded-md"
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                >
-                  <option value="">All</option>
-                  <option value="GEDCOM">GEDCOM</option>
-                  <option value="HistoricalDocument">Historical Document</option>
-                  <option value="SlaveRecord">Slave Record</option>
-                  <option value="FamilyTree">Family Tree</option>
-                  <option value="DNATest">DNA Test</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              
               <button
                 className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-2 px-4 rounded transition"
                 onClick={() => {

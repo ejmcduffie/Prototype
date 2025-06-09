@@ -1,49 +1,75 @@
-import NextAuth from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
-import User from '@/models/User';
-import { connectToDB } from '@/lib/dbconnect';
-import { AuthOptions } from 'next-auth';
-import { JWT } from 'next-auth/jwt';
+import NextAuth from "next-auth"
+import Google from "next-auth/providers/google"
+import { createClient } from "@supabase/supabase-js"
 
-// Extend the JWT type to include user ID
-interface ExtendedJWT extends JWT {
-  id?: string;
-}
+// Initialize Supabase client
+export const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-export const authOptions: AuthOptions = {
+export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
-    CredentialsProvider({
-      name: 'Credentials',
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
-      },
-      async authorize(credentials) {
-        await dbConnect();
-        const user = await User.findOne({ email: credentials?.email });
-        if (user && credentials?.password && bcrypt.compareSync(credentials.password, user.password)) {
-          return { id: user._id.toString(), email: user.email, name: user.name };
-        }
-        return null;
-      }
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     })
   ],
-  session: { strategy: 'jwt' as const },
+  session: {
+    strategy: "jwt",
+  },
   callbacks: {
-    async jwt({ token, user }: { token: ExtendedJWT, user: any }) {
-      if (user) token.id = user.id;
-      return token;
-    },
-    async session({ session, token }: { session: any, token: ExtendedJWT }) {
-      if (token.id) {
-        session.user.id = token.id;
+    async jwt({ token, account, profile }) {
+      // Initial sign in
+      if (account && profile) {
+        // Store provider info in the token
+        token.provider = account.provider
+        token.accessToken = account.access_token
+        
+        // Sync user data to Supabase
+        const { data: userData, error } = await supabase
+          .from('users')
+          .upsert(
+            {
+              id: token.sub,
+              email: profile.email,
+              name: profile.name,
+              image: profile.picture || profile.image,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'id' }
+          )
+          
+        if (error) {
+          console.error('Error syncing user to Supabase:', error)
+        }
       }
-      return session;
+      return token
+    },
+    async session({ session, token }) {
+      // Send required properties to the client
+      if (session.user) {
+        session.user.id = token.sub!
+        session.user.name = token.name
+        session.user.email = token.email
+        session.user.image = token.picture as string
+        session.accessToken = token.accessToken as string
+      }
+      return session
+    },
+    async signIn({ user, account, profile }) {
+      // You can add additional sign-in logic here
+      // For example, restrict sign-in to specific email domains
+      return true
     }
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  pages: { signIn: '/login' }
-};
+  pages: {
+    signIn: '/login',
+    error: '/auth/error', // Make sure this matches your error page
+  },
+  // Enable debug in development
+  debug: process.env.NODE_ENV === 'development',
+})
 
-export default NextAuth(authOptions);
+// Export auth function for middleware
+export { auth as middleware }

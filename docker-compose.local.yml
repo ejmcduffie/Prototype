@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  # Redis Service
+  redis:
+    image: redis:7-alpine
+    container_name: ancestrychain-redis
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-your-secure-password}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # Local Blockchain Node (Hardhat)
+  hardhat-node:
+    build:
+      context: .
+      dockerfile: docker/hardhat/Dockerfile
+    container_name: ancestrychain-hardhat
+    ports:
+      - "8545:8545"
+    volumes:
+      - ./contracts:/app/contracts
+      - ./scripts:/app/scripts
+      - hardhat_data:/app/artifacts
+    environment:
+      - HARDHAT_NETWORK=hardhat
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  hardhat_data:

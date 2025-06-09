@@ -34,6 +34,9 @@ const Header = () => {
             <Link href="/dashboard" className={isActive('/dashboard')}>
               Dashboard
             </Link>
+            <Link href="/files" className={isActive('/files')}>
+              Files
+            </Link>
             <Link href="/upload" className={isActive('/upload')}>
               Upload
             </Link>

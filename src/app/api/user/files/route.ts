@@ -1,97 +1,91 @@
+// src/app/api/user/files/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import authOptions from '@/auth';
-import { getDatabase } from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { getServerSession } from 'next-auth/next';
+import { createClient } from '@supabase/supabase-js';
+import { authOptions } from '@/lib/auth-options';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!supabaseUrl || !serviceRoleKey) {
+  throw new Error('Supabase URL or Service Role Key is not defined for user/files API.');
+}
+
+// Initialize Supabase client with service role key for this route
+const supabase = createClient(supabaseUrl, serviceRoleKey);
 
 export async function GET(request: NextRequest) {
   try {
-    // Authenticate the user
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // @ts-ignore
+    if (!session?.user?.providerId) {
+      console.log('User Files API: Unauthorized - No providerId in session user', session?.user);
+      return NextResponse.json({ error: 'Unauthorized - Missing providerId' }, { status: 401 });
     }
     
-    const userId = session.user.id;
+    // @ts-ignore
+    const providerId = session.user.providerId as string;
+
+    // Get user from database using provider ID to fetch their internal UUID
+    const { data: dbUser, error: userFetchError } = await supabase
+      .from('users') // Ensure this is your public users table
+      .select('id')
+      .eq('provider_id', providerId)
+      .single();
+
+    if (userFetchError || !dbUser) {
+      console.error(`User Files API: User not found for providerId: ${providerId}`, userFetchError);
+      return NextResponse.json({ error: 'User not found or error fetching user' }, { status: 404 });
+    }
+
+    const internalUserId = dbUser.id;
+
     const { searchParams } = new URL(request.url);
-    
-    // Parse query parameters
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const status = searchParams.get('status') || '';
-    const fileCategory = searchParams.get('fileCategory') || '';
-    const sortBy = searchParams.get('sortBy') || 'uploadDate';
-    const sortOrder = searchParams.get('sortOrder') || 'desc';
-    const search = searchParams.get('search') || '';
-    
-    // Calculate pagination
-    const skip = (page - 1) * limit;
-    
-    // Build query
-    const query: any = { userId: new ObjectId(userId) };
-    
-    // Add status filter if provided
-    if (status) {
-      query.status = status;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const limit = parseInt(searchParams.get('limit') || '10', 10);
+    const offset = (page - 1) * limit;
+
+    const { data: files, error: filesError } = await supabase
+      .from('files') // Ensure this is your public files table
+      .select('*')
+      .eq('user_id', internalUserId) // Use the internal UUID
+      .order('uploaded_at', { ascending: false }) // Assuming 'uploaded_at' or 'created_at'
+      .range(offset, offset + limit - 1);
+
+    if (filesError) {
+      console.error('User Files API: Error fetching files from Supabase:', filesError);
+      return NextResponse.json(
+        { error: 'Failed to fetch files', details: filesError.message },
+        { status: 500 }
+      );
     }
-    
-    // Add file category filter if provided
-    if (fileCategory) {
-      query.fileCategory = fileCategory;
+
+    const { count, error: countError } = await supabase
+      .from('files')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', internalUserId);
+
+    if (countError) {
+      console.error('User Files API: Error counting files from Supabase:', countError);
+      return NextResponse.json(
+        { error: 'Failed to count files', details: countError.message },
+        { status: 500 }
+      );
     }
-    
-    // Add search filter if provided
-    if (search) {
-      query.$or = [
-        { originalName: { $regex: search, $options: 'i' } },
-        { fileType: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    // Build sort
-    const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
-    
-    // Connect to database
-    const db = await getDatabase();
-    if (!db) {
-      return NextResponse.json({ error: 'Database connection failed' }, { status: 500 });
-    }
-    
-    // Get files collection
-    const filesCollection = db.collection('fileUploads');
-    
-    // Get total count for pagination
-    const total = await filesCollection.countDocuments(query);
-    
-    // Fetch files with pagination, filtering, and sorting
-    const files = await filesCollection
-      .find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-    
-    // Format the response
-    const result = {
+
+    return NextResponse.json({
       files,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page < Math.ceil(total / limit)
-      },
-      filters: {
-        status,
-        fileCategory,
-        search
-      }
-    };
-    
-    return NextResponse.json(result);
-  } catch (error) {
-    console.error('Error fetching user files:', error);
-    return NextResponse.json({ error: 'Failed to fetch files' }, { status: 500 });
+      total: count || 0,
+      page,
+      totalPages: Math.ceil((count || 0) / limit),
+    });
+
+  } catch (error: any) {
+    console.error('User Files API: Unexpected error in GET /api/user/files:', error);
+    return NextResponse.json(
+      { error: 'An unexpected error occurred', details: error.message },
+      { status: 500 }
+    );
   }
 }
