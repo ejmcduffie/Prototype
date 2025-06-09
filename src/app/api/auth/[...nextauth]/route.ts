@@ -1,9 +1,9 @@
 import NextAuth from 'next-auth';
 import Google from 'next-auth/providers/google';
-import { createClient } from '@supabase/supabase-js';
 import { SupabaseAdapter } from '@auth/supabase-adapter';
+import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client
+// Optional: Supabase client for custom DB logic (not used by NextAuth adapter directly)
 export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -12,42 +12,29 @@ export const supabase = createClient(
 const handler = NextAuth({
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!
+    // schema option removed for compatibility
   }),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    })
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
+        };
+      },
+    }),
   ],
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: 'jwt' },
   callbacks: {
-    async jwt({ token, account, profile }) {
-      // Initial sign in
-      if (account && profile) {
+    async jwt({ token, account }) {
+      if (account) {
         token.provider = account.provider;
         token.accessToken = account.access_token;
-        
-        // Sync user data to Supabase (match table schema)
-        const { error } = await supabase
-          .from('users')
-          .upsert(
-            {
-              id: token.sub, // Google sub as user id
-              profile_data: {
-                email: profile.email,
-                name: profile.name,
-                image: profile.picture || profile.image
-              },
-              updated_at: new Date().toISOString()
-            },
-            { onConflict: 'id' }
-          );
-        if (error) {
-          console.error('Error syncing user to Supabase:', error);
-        }
       }
       return token;
     },
